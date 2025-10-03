@@ -117,7 +117,6 @@ std::vector<uint8_t> deserializePdb(std::string filename) {
 }
 
 void serializePdb(std::vector<uint8_t> const& data, std::string filename) {
-    std::cout << "serializing" << std::endl;
     std::ofstream os(filename, std::ios::binary);
     if (!os.good()) { throw std::runtime_error("Cannot open file for writing"); }
 

@@ -101,19 +101,25 @@ int main() {
     qb = qb.rotHoriz(Row::Top, Direction::Left);
     qb = qb.rotXaxis(CrossSection::Back, Direction::_180);
     qb = qb.rotVert(Column::Right, Direction::_180);
-    qb = qb.rotHoriz(Row::Bottom, Direction::_180);
+    // qb = qb.rotHoriz(Row::Bottom, Direction::_180);
     //qb = qb.rotXaxis(CrossSection::Middle, Direction::Right);
     //qb = qb.rotHoriz(Row::Bottom, Direction::Right);
     //Check if pattern databases exist, and generate them
     //if they don't
     std::ifstream pdbCheck;
 
-    pdbCheck.open("pdb/corner_cubies.pdb");
+    pdbCheck.open("../pdb/corner_cubies.pdb");
     //actually insane that this generates in half a second on my mac
-    if (!pdbCheck.good()) { serializePdb(PDB(MiniCube(), 3674160).data, "pdb/8_corner_cubies.pdb"); }
+    if (!pdbCheck.good()) {
+        std::cout << "No corner cubies PDB, generating..." << std::endl;
+        serializePdb(PDB(MiniCube(), 3674160).data, "pdb/8_corner_cubies.pdb");
+    }
     pdbCheck.close();
-    pdbCheck.open("pdb/edge_cubies_first.pdb");
-    if (!pdbCheck.good()) { serializePdb(PDB(EdgeCubies<6>(), 42577920).data, "pdb/edge_cubies_first.pdb"); }
+    pdbCheck.open("../pdb/edge_cubies_6.pdb");
+    if (!pdbCheck.good()) {
+        std::cout << "No edge cubies PDB, generating..." << std::endl;
+        serializePdb(PDB(EdgeCubies<6>(), 42577920).data, "pdb/edge_cubies_first.pdb");
+    }
     pdbCheck.close();
 
 

@@ -10,7 +10,6 @@
 #include <functional>
 #include <utility>
 #include <array>
-#include <array>
 #include <filesystem>
 
 std::pair<std::vector<Cube>, uint64_t> idaStar(Cube start) {
@@ -22,24 +21,24 @@ std::pair<std::vector<Cube>, uint64_t> idaStar(Cube start) {
 	};
 
 	//PDB<EdgeCubies> firstEdgeCubieDB(deserializePdb("pdb/7_edge_cubies_first.pdb"));
-	PDB<EdgeCubies<12>> edgeCubie12DB(deserializePdb("../pdb/edge_cubies_no_orient.pdb"));
+	// PDB<EdgeCubies<12>> edgeCubie12DB(deserializePdb("../pdb/edge_cubies_no_orient.pdb"));
 	//PDB<EdgeCubies> secondEdgeCubieDB(deserializePdb("pdb/edge_cubies_second.pdb"));
-	PDB<EdgeCubies<7>> firstEdgeCubieDB(deserializePdb("../pdb/7_edge_cubies_first.pdb"));
-	//PDB<EdgeCubies<6>> secondEdgeCubieDB(deserializePdb("../pdb/edge_cubies_second.pdb"));
+	// PDB<EdgeCubies<7>> firstEdgeCubieDB(deserializePdb("../pdb/7_edge_cubies_first.pdb"));
+	PDB<EdgeCubies<6>> edgeCubie6DB(deserializePdb("../pdb/edge_cubies_6.pdb"));
 	PDB<MiniCube> cornerCubieDB(deserializePdb("../pdb/corner_cubies.pdb"));
 
 	std::cout << "Solving cube:" << std::endl;
 
 	auto heuristic = [&](Cube const& cube) {
 		MiniCube cornerCubies(cube);
-		EdgeCubies edgeCubies12 = EdgeCubies<12>(cube, false, true);
-		EdgeCubies firstEdgeSet = EdgeCubies<7>(cube);
+		// EdgeCubies edgeCubies12 = EdgeCubies<12>(cube, false, true);
+		EdgeCubies edgeCubies6 = EdgeCubies<6>(cube);
 		//EdgeCubies secondEdgeSet = EdgeCubies<6>(cube, true, false);
 
 		return std::max({
 		    cornerCubieDB.getDist(cornerCubies.getIdx()),
-			edgeCubie12DB.getDist(edgeCubies12.getIdx()),
-			firstEdgeCubieDB.getDist(firstEdgeSet.getIdx()),
+			edgeCubie6DB.getDist(edgeCubies6.getIdx()),
+			// firstEdgeCubieDB.getDist(firstEdgeSet.getIdx()),
 		    //secondEdgeCubieDB.getDist(secondEdgeSet.getIdx()),
 		});
 	};
@@ -118,6 +117,7 @@ std::vector<uint8_t> deserializePdb(std::string filename) {
 }
 
 void serializePdb(std::vector<uint8_t> const& data, std::string filename) {
+    std::cout << "serializing" << std::endl;
     std::ofstream os(filename, std::ios::binary);
     if (!os.good()) { throw std::runtime_error("Cannot open file for writing"); }
 

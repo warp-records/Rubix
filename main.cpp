@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include <time.h>
 #include <cassert>
 #include "cube.hpp"
@@ -19,6 +20,12 @@
 #include "alg.hpp"
 #include "cube.hpp"
 
+// was literally shouting while trying to get this to FUCKING WORK
+// but I fucking give up I just have to force it
+#include "hwy/targets.h"
+#undef HWY_STATIC_TARGET
+#define HWY_STATIC_TARGET HWY_AVX2
+#include <hwy/highway.h>
 
 constexpr std::string_view VERSION = "0.3.0";
 
@@ -76,7 +83,6 @@ int main() {
     )" << std::endl;
 
     Cube qb;
-
 
     //EdgeCubies edgeCubies{};
     //edgeCubies.noOrient = true;

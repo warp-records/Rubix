@@ -5,6 +5,11 @@
 #include <bit>
 #include <iostream>
 
+#include "hwy/targets.h"
+#undef HWY_STATIC_TARGET
+#define HWY_STATIC_TARGET HWY_AVX2
+#include <hwy/highway.h>
+
 MiniCube::MiniCube() {
 	front =  WhiteFace;
 	top =    GreenFace;
@@ -385,8 +390,8 @@ uint32_t MiniCube::getIdx() const {
 		1, 1, 2, 6, 24, 120, 720, 5040
 	};
 
-	uint32_t const powerOf3[7] {
-		1, 3, 9, 27, 81, 243, 729
+	uint32_t const powerOf3[8] {
+		1, 3, 9, 27, 81, 243, 729, 0
 	};
 
 	//Index of all cubibes that HAVEN'T been visited
@@ -400,6 +405,8 @@ uint32_t MiniCube::getIdx() const {
 
 	uint32_t idx = 0;
 
+	//----------OLD CODE----------
+	/*
 	//Last cube is already known given cube numbers 1-6
 
 	//PLEASE PLEASE PLEASE FUCKINGGG WORK
@@ -409,19 +416,86 @@ uint32_t MiniCube::getIdx() const {
 		//For this to work, each Cubie ID must max out to the number left
 		auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
 
-		idx += factorial[i]*(indices[info.id]-PADDING)*powerOf3[i] +
-				factorial[i]*powerOf3[i-1]*info.orientation;
+		uint32_t a = (indices[info.id]-PADDING)*powerOf3[i];
+		uint32_t b = powerOf3[i-1]*info.orientation;
+		uint32_t c = a + b;
+		idx += factorial[i]*c;
 
 		//I'm a genius for this
 		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
 		uint64_t subtractConst = (0x0101010101010101ULL << (info.id*8));
 		packed -= subtractConst;
 		*reinterpret_cast<uint64_t*>(indices) = packed;
-		/*
-		for (int j = info.id; j < 8; j++) {
-			indices[j]--;
-		}*/
+
+		// for (int j = info.id; j < 8; j++) {
+		// 	indices[j]--;
+		// }
 	}
+
+	return idx;
+
+	 */
+	//----------NEW CODE----------
+
+	namespace hn = hwy::HWY_NAMESPACE;
+
+	using TagType = hn::FixedTag<uint32_t, 8>;
+
+	std::array<uint32_t, 8> infoIdArr;
+	std::array<uint32_t, 8> infoOrientArr;
+	std::array<uint32_t, 8> offsetIndicesArr;
+
+	uint32_t const powerOf3Minus1[8] {
+		0, 1, 3, 9, 27, 81, 243, 0
+	};
+
+
+	for (int i = 6; i > 0; i--) {
+    	auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
+        infoIdArr[i] = info.id;
+        infoOrientArr[i] = info.orientation;
+
+		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
+		uint64_t subtractConst = (0x0101010101010101ULL << (info.id*8));
+		packed -= subtractConst;
+
+		*reinterpret_cast<uint64_t*>(indices) = packed;
+	}
+
+	for (int i = 0; i < 8; i++) {
+    	offsetIndicesArr[i] = static_cast<uint32_t>(indices[i]);
+	}
+
+	auto offsetIndices = hn::LoadU(TagType(), offsetIndicesArr.data());
+
+	auto infoIds = hn::LoadU(TagType(), infoIdArr.data());
+
+	// apparently you have
+	auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
+
+	// part a
+	auto pows3 =        hn::LoadU(TagType(), powerOf3);
+	auto orderedIndices = hn::TableLookupLanes(offsetIndices, infoIdsAsIndices);
+	auto paddingVec = hn::Set(TagType(), PADDING);
+	auto idOffsets = hn::Mul(hn::Sub(orderedIndices, paddingVec), pows3);
+
+	// part b
+	auto infoOrients = hn::LoadU(TagType(), infoOrientArr.data());
+	auto pows3Minus1 =        hn::LoadU(TagType(), powerOf3Minus1);
+	auto orientOffsets = hn::Mul(pows3Minus1, infoOrients);
+
+	// part c
+	auto totalOffset = hn::Add(idOffsets, orientOffsets);
+	auto factorials = hn::LoadU(TagType(), factorial);
+	totalOffset = hn::Mul(totalOffset, factorials);
+
+	// skip first and last lanes
+	auto skipLast = hn::FirstN(TagType(), 7);
+	auto skipFirst = hn::Not(hn::FirstN(TagType(), 1));
+	auto mask = hn::And(skipLast, skipFirst);
+
+	totalOffset  = hn::IfThenElseZero(mask, totalOffset);
+	idx = hn::ReduceSum(TagType(), totalOffset);
 
 	return idx;
 }

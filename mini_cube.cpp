@@ -380,7 +380,11 @@ MiniCube::MiniCube(Cube const& large) {
 
 
 uint32_t MiniCube::getIdx() const {
-	//bool usedIds[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+    getIdxNorm();
+}
+
+uint32_t MiniCube::getIdxNorm() const {
+    //bool usedIds[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
 	//7!*3^5 ... 2!*3^1
 
 	//HELPFHDSAFADSHNFSDK
@@ -403,7 +407,6 @@ uint32_t MiniCube::getIdx() const {
 	};
 
 	uint32_t idx = 0;
-	/*
 	//----------OLD CODE----------
 	//Last cube is already known given cube numbers 1-6
 
@@ -429,14 +432,31 @@ uint32_t MiniCube::getIdx() const {
 		// 	indices[j]--;
 		// }
 	}
-	return idx;*/
-	//---------END OLD CODE----------
-	//----------NEW CODE----------
-	namespace hn = hwy::HWY_NAMESPACE;
+	return idx;
+}
 
+uint32_t MiniCube::getIdxAvx() const {
+
+	namespace hn = hwy::HWY_NAMESPACE;
 	using TagType = hn::FixedTag<uint32_t, 8>;
 
-	std::array<uint32_t, 8> infoIdArr{};
+	uint32_t const factorial[8] {
+    	1, 1, 2, 6, 24, 120, 720, 5040
+	};
+
+	uint32_t const powerOf3[8] {
+    	1, 3, 9, 27, 81, 243, 729, 0
+	};
+
+	constexpr int PADDING = 6;
+	alignas(uint64_t) uint8_t indices[8] = {
+		0+PADDING, 1+PADDING, 2+PADDING, 0+PADDING,
+		3+PADDING, 4+PADDING, 5+PADDING, 6+PADDING
+	};
+
+    uint32_t idx = 0;
+
+    std::array<uint32_t, 8> infoIdArr{};
 	std::array<uint32_t, 8> infoOrientArr{};
 	std::array<uint32_t, 8> offsetIndicesArr{};
 
@@ -444,26 +464,19 @@ uint32_t MiniCube::getIdx() const {
 		0, 1, 3, 9, 27, 81, 243, 0
 	};
 
-
-	alignas(uint64_t) uint8_t indicesNew[8] = {
-		0+PADDING, 1+PADDING, 2+PADDING, 0+PADDING,
-		3+PADDING, 4+PADDING, 5+PADDING, 6+PADDING
-	};
-
 	for (int i = 6; i > 0; i--) {
-    	auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
+       	auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
         infoIdArr[i] = info.id;
         infoOrientArr[i] = info.orientation;
 
-       	offsetIndicesArr[i] = static_cast<uint32_t>(indicesNew[info.id]);
+       	offsetIndicesArr[i] = static_cast<uint32_t>(indices[info.id]);
 
-		uint64_t packed = *reinterpret_cast<uint64_t*>(indicesNew);
+		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
 		uint64_t subtractConst = (0x0101010101010101ULL << (info.id*8));
 		packed -= subtractConst;
 
-		*reinterpret_cast<uint64_t*>(indicesNew) = packed;
+		*reinterpret_cast<uint64_t*>(indices) = packed;
 	}
-
 
 	auto offsetIndices = hn::LoadU(TagType(), offsetIndicesArr.data());
 	auto infoIds = hn::LoadU(TagType(), infoIdArr.data());
@@ -496,10 +509,7 @@ uint32_t MiniCube::getIdx() const {
 	idx = hn::ReduceSum(TagType(), totalOffset);
 
 	return idx;
-	//---------END NEW CODE------------
 }
-
-
 
 
 

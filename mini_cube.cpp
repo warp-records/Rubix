@@ -385,7 +385,6 @@ uint32_t MiniCube::getIdx() const {
 
 	//HELPFHDSAFADSHNFSDK
 
-	//Maybe try a simpler implementation
 	uint32_t const factorial[8] {
 		1, 1, 2, 6, 24, 120, 720, 5040
 	};
@@ -404,9 +403,8 @@ uint32_t MiniCube::getIdx() const {
 	};
 
 	uint32_t idx = 0;
-
-	//----------OLD CODE----------
 	/*
+	//----------OLD CODE----------
 	//Last cube is already known given cube numbers 1-6
 
 	//PLEASE PLEASE PLEASE FUCKINGGG WORK
@@ -431,57 +429,57 @@ uint32_t MiniCube::getIdx() const {
 		// 	indices[j]--;
 		// }
 	}
-
-	return idx;
-
-	 */
+	return idx;*/
+	//---------END OLD CODE----------
 	//----------NEW CODE----------
-
 	namespace hn = hwy::HWY_NAMESPACE;
 
 	using TagType = hn::FixedTag<uint32_t, 8>;
 
-	std::array<uint32_t, 8> infoIdArr;
-	std::array<uint32_t, 8> infoOrientArr;
-	std::array<uint32_t, 8> offsetIndicesArr;
+	std::array<uint32_t, 8> infoIdArr{};
+	std::array<uint32_t, 8> infoOrientArr{};
+	std::array<uint32_t, 8> offsetIndicesArr{};
 
 	uint32_t const powerOf3Minus1[8] {
 		0, 1, 3, 9, 27, 81, 243, 0
 	};
 
 
+	alignas(uint64_t) uint8_t indicesNew[8] = {
+		0+PADDING, 1+PADDING, 2+PADDING, 0+PADDING,
+		3+PADDING, 4+PADDING, 5+PADDING, 6+PADDING
+	};
+
 	for (int i = 6; i > 0; i--) {
     	auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
         infoIdArr[i] = info.id;
         infoOrientArr[i] = info.orientation;
 
-		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
+       	offsetIndicesArr[i] = static_cast<uint32_t>(indicesNew[info.id]);
+
+		uint64_t packed = *reinterpret_cast<uint64_t*>(indicesNew);
 		uint64_t subtractConst = (0x0101010101010101ULL << (info.id*8));
 		packed -= subtractConst;
 
-		*reinterpret_cast<uint64_t*>(indices) = packed;
+		*reinterpret_cast<uint64_t*>(indicesNew) = packed;
 	}
 
-	for (int i = 0; i < 8; i++) {
-    	offsetIndicesArr[i] = static_cast<uint32_t>(indices[i]);
-	}
 
 	auto offsetIndices = hn::LoadU(TagType(), offsetIndicesArr.data());
-
 	auto infoIds = hn::LoadU(TagType(), infoIdArr.data());
 
 	// apparently you have
-	auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
+	// auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
 
 	// part a
 	auto pows3 =        hn::LoadU(TagType(), powerOf3);
-	auto orderedIndices = hn::TableLookupLanes(offsetIndices, infoIdsAsIndices);
+	// auto orderedIndices = hn::TableLookupLanes(offsetIndices, infoIdsAsIndices);
 	auto paddingVec = hn::Set(TagType(), PADDING);
-	auto idOffsets = hn::Mul(hn::Sub(orderedIndices, paddingVec), pows3);
+	auto idOffsets = hn::Mul(hn::Sub(offsetIndices, paddingVec), pows3);
 
 	// part b
 	auto infoOrients = hn::LoadU(TagType(), infoOrientArr.data());
-	auto pows3Minus1 =        hn::LoadU(TagType(), powerOf3Minus1);
+	auto pows3Minus1 = hn::LoadU(TagType(), powerOf3Minus1);
 	auto orientOffsets = hn::Mul(pows3Minus1, infoOrients);
 
 	// part c
@@ -498,6 +496,7 @@ uint32_t MiniCube::getIdx() const {
 	idx = hn::ReduceSum(TagType(), totalOffset);
 
 	return idx;
+	//---------END NEW CODE------------
 }
 
 

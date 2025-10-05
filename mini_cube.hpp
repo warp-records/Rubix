@@ -23,7 +23,7 @@ namespace MiniMask {
 	namespace Row {
 		uint16_t constexpr Top = 	0xFC0;
 		uint16_t constexpr Bottom = 0x03F;
-	}; 
+	};
 
 };
 
@@ -37,14 +37,14 @@ struct MiniCube {
 		BlueFace = 	 0x924,
 		OrangeFace = 0xB6D
 	};
-    
+
     uint16_t top, bottom, left, right, front, back;
 
  	MiniCube();
 	MiniCube(uint16_t top, uint16_t bottom,
 		uint16_t front, uint16_t back,
 		uint16_t left, uint16_t right);
-    
+
     //union  {}
 	//Construct minicube from corner cubies
 	MiniCube(Cube const& largeCube);
@@ -73,6 +73,9 @@ struct MiniCube {
 
 private:
 
+    uint32_t getIdxAvx() const;
+    uint32_t getIdxNorm() const;
+
 	//If this becomes a bottleneck, it could possibly
 	//be sped up with a permute instruction
 	static uint16_t rotFaceLeft(uint16_t face);
@@ -90,4 +93,3 @@ std::ostream& operator<<(std::ostream& os, const MiniCube& cube);
 //For debbuging
 bool operator==(MiniCube const& lhs, MiniCube const& rhs);
 bool operator!=(MiniCube const& lhs, MiniCube const& rhs);
-

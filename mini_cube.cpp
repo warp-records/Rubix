@@ -380,7 +380,7 @@ MiniCube::MiniCube(Cube const& large) {
 
 
 uint32_t MiniCube::getIdx() const {
-    getIdxNorm();
+    return getIdxAvx();
 }
 
 uint32_t MiniCube::getIdxNorm() const {
@@ -440,11 +440,11 @@ uint32_t MiniCube::getIdxAvx() const {
 	namespace hn = hwy::HWY_NAMESPACE;
 	using TagType = hn::FixedTag<uint32_t, 8>;
 
-	uint32_t const factorial[8] {
+	alignas(32) uint32_t const factorial[8] {
     	1, 1, 2, 6, 24, 120, 720, 5040
 	};
 
-	uint32_t const powerOf3[8] {
+	alignas(32) uint32_t const powerOf3[8] {
     	1, 3, 9, 27, 81, 243, 729, 0
 	};
 
@@ -454,13 +454,13 @@ uint32_t MiniCube::getIdxAvx() const {
 		3+PADDING, 4+PADDING, 5+PADDING, 6+PADDING
 	};
 
-    uint32_t idx = 0;
+    alignas(32) uint32_t idx = 0;
 
-    std::array<uint32_t, 8> infoIdArr{};
-	std::array<uint32_t, 8> infoOrientArr{};
-	std::array<uint32_t, 8> offsetIndicesArr{};
+    alignas(32) uint32_t infoIdArr[8] = {0};
+	alignas(32) uint32_t infoOrientArr[8] = {0};
+	alignas(32) uint32_t offsetIndicesArr[8] = {0};
 
-	uint32_t const powerOf3Minus1[8] {
+	alignas(32) uint32_t const powerOf3Minus1[8] {
 		0, 1, 3, 9, 27, 81, 243, 0
 	};
 
@@ -478,26 +478,26 @@ uint32_t MiniCube::getIdxAvx() const {
 		*reinterpret_cast<uint64_t*>(indices) = packed;
 	}
 
-	auto offsetIndices = hn::LoadU(TagType(), offsetIndicesArr.data());
-	auto infoIds = hn::LoadU(TagType(), infoIdArr.data());
+	auto offsetIndices = hn::Load(TagType(), offsetIndicesArr);
+	auto infoIds = hn::Load(TagType(), infoIdArr);
 
 	// apparently you have
 	// auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
 
 	// part a
-	auto pows3 =        hn::LoadU(TagType(), powerOf3);
+	auto pows3 =        hn::Load(TagType(), powerOf3);
 	// auto orderedIndices = hn::TableLookupLanes(offsetIndices, infoIdsAsIndices);
 	auto paddingVec = hn::Set(TagType(), PADDING);
 	auto idOffsets = hn::Mul(hn::Sub(offsetIndices, paddingVec), pows3);
 
 	// part b
-	auto infoOrients = hn::LoadU(TagType(), infoOrientArr.data());
-	auto pows3Minus1 = hn::LoadU(TagType(), powerOf3Minus1);
+	auto infoOrients = hn::Load(TagType(), infoOrientArr);
+	auto pows3Minus1 = hn::Load(TagType(), powerOf3Minus1);
 	auto orientOffsets = hn::Mul(pows3Minus1, infoOrients);
 
 	// part c
 	auto totalOffset = hn::Add(idOffsets, orientOffsets);
-	auto factorials = hn::LoadU(TagType(), factorial);
+	auto factorials = hn::Load(TagType(), factorial);
 	totalOffset = hn::Mul(totalOffset, factorials);
 
 	// skip first and last lanes

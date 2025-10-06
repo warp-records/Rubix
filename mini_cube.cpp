@@ -438,7 +438,6 @@ uint32_t MiniCube::getIdxNorm() const {
 uint32_t MiniCube::getIdxAvx() const {
 
 	namespace hn = hwy::HWY_NAMESPACE;
-	using TagType = hn::FixedTag<uint32_t, 8>;
 
 	alignas(32) uint32_t const factorial[8] {
     	1, 1, 2, 6, 24, 120, 720, 5040
@@ -464,22 +463,77 @@ uint32_t MiniCube::getIdxAvx() const {
 		0, 1, 3, 9, 27, 81, 243, 0
 	};
 
-	for (int i = 6; i > 0; i--) {
-       	auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
-        infoIdArr[i] = info.id;
-        infoOrientArr[i] = info.orientation;
 
-       	offsetIndicesArr[i] = static_cast<uint32_t>(indices[info.id]);
+	//----------Inline equivalent of getCubieInfo here----------
+	//Only need 128 bits here
+	using TagTypeCI = hn::FixedTag<uint16_t, 8>;
+
+	auto loopCounter = hn::Iota(TagTypeCI(), 0);
+
+	auto bitMask = hn::Set(TagTypeCI(), 0b001);
+	auto isRight = hn::TestBit(loopCounter, bitMask);
+	     bitMask = hn::Set(TagTypeCI(), 0b010);
+	auto isBottom = hn::TestBit(loopCounter, bitMask);
+       	 bitMask = hn::Set(TagTypeCI(), 0b100);
+	auto isBack = hn::TestBit(loopCounter, bitMask);
+	auto last3Bits = hn::Set(TagTypeCI(), 0b111);
+
+	auto leftFace = hn::Set(TagTypeCI(), left);
+	auto rightFace = hn::Set(TagTypeCI(), right);
+	auto xFace = hn::IfThenElse(isRight, rightFace, leftFace);
+	auto rightOrBack = hn::Not(hn::Xor(isRight, isBack));
+	xFace = hn::MaskedShiftRightOr<3>(xFace, rightOrBack, xFace);
+	auto isTop = hn::Not(isBottom);
+	xFace = hn::MaskedShiftRightOr<6>(xFace, isTop, xFace);
+	xFace &= last3Bits;
+
+	auto topFace = hn::Set(TagTypeCI(), top);
+	auto bottomFace = hn::Set(TagTypeCI(), bottom);
+	auto yFace = hn::IfThenElse(isBottom, bottomFace, topFace);
+	auto isLeft = hn::Not(isRight);
+	yFace = hn::MaskedShiftRightOr<3>(yFace, isLeft, yFace);
+	auto bottomOrBack = hn::Not(hn::Xor(isBottom, isBack));
+	yFace = hn::MaskedShiftRightOr<6>(yFace, bottomOrBack, yFace);
+    yFace &= last3Bits;
+
+	auto frontFace = hn::Set(TagTypeCI(), front);
+	auto backFace = hn::Set(TagTypeCI(), back);
+	auto zFace = hn::IfThenElse(isBack, backFace, frontFace);
+	zFace = hn::MaskedShiftRightOr<3>(zFace, rightOrBack, zFace);
+	zFace = hn::MaskedShiftRightOr<6>(zFace, isTop, zFace);
+    zFace &= last3Bits;
+
+	auto ids = xFace^yFace^zFace;
+
+	auto xGty = hn::Gt(xFace, yFace);
+	auto xGtz = hn::Gt(xFace, zFace);
+	auto yGtx = hn::Gt(yFace, xFace);
+	auto yGtz = hn::Gt(yFace, zFace);
+
+	auto zeroVec = hn::Zero(TagTypeCI());
+	auto oneVec = hn::Set(TagTypeCI(), 1);
+	auto twoVec = hn::Set(TagTypeCI(), 2);
+	auto orients = hn::IfThenElse(hn::And(xGty, xGtz), zeroVec, twoVec);
+	orients = hn::IfThenElse(hn::And(yGtx, yGtz), zeroVec, oneVec);
+	//----------------------------------------------------------
+	auto infoOrients = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), orients);
+	auto infoIds = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), ids);
+
+	alignas(16) uint16_t infoIdsArr[8];
+	hn::StoreU(ids, TagTypeCI(), infoIdsArr);
+
+	for (int i = 6; i > 0; i--) {
+       	offsetIndicesArr[i] = static_cast<uint32_t>(indices[infoIdsArr[i]]);
 
 		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
-		uint64_t subtractConst = (0x0101010101010101ULL << (info.id*8));
+		uint64_t subtractConst = (0x0101010101010101ULL << (infoIdsArr[i]));
 		packed -= subtractConst;
 
 		*reinterpret_cast<uint64_t*>(indices) = packed;
 	}
 
-	auto offsetIndices = hn::Load(TagType(), offsetIndicesArr);
-	auto infoIds = hn::Load(TagType(), infoIdArr);
+    using TagType = hn::FixedTag<uint32_t, 8>;
+
 
 	// apparently you have
 	// auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
@@ -488,10 +542,11 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto pows3 =        hn::Load(TagType(), powerOf3);
 	// auto orderedIndices = hn::TableLookupLanes(offsetIndices, infoIdsAsIndices);
 	auto paddingVec = hn::Set(TagType(), PADDING);
+	auto offsetIndices = hn::Load(TagType(), offsetIndicesArr);
 	auto idOffsets = hn::Mul(hn::Sub(offsetIndices, paddingVec), pows3);
 
 	// part b
-	auto infoOrients = hn::Load(TagType(), infoOrientArr);
+	// auto infoOrients = hn::Load(TagType(), infoOrientArr);
 	auto pows3Minus1 = hn::Load(TagType(), powerOf3Minus1);
 	auto orientOffsets = hn::Mul(pows3Minus1, infoOrients);
 

@@ -32,12 +32,12 @@ std::pair<std::vector<Cube>, uint64_t> idaStar(Cube start) {
 	auto heuristic = [&](Cube const& cube) {
 		MiniCube cornerCubies(cube);
 		// EdgeCubies edgeCubies12 = EdgeCubies<12>(cube, false, true);
-		EdgeCubies edgeCubies6 = EdgeCubies<6>(cube);
+		// EdgeCubies edgeCubies6 = EdgeCubies<6>(cube);
 		//EdgeCubies secondEdgeSet = EdgeCubies<6>(cube, true, false);
 
 		return std::max({
 		    cornerCubieDB.getDist(cornerCubies.getIdx()),
-			edgeCubie6DB.getDist(edgeCubies6.getIdx()),
+			// edgeCubie6DB.getDist(edgeCubies6.getIdx()),
 			// firstEdgeCubieDB.getDist(firstEdgeSet.getIdx()),
 		    //secondEdgeCubieDB.getDist(secondEdgeSet.getIdx()),
 		});

@@ -514,7 +514,7 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto oneVec = hn::Set(TagTypeCI(), 1);
 	auto twoVec = hn::Set(TagTypeCI(), 2);
 	auto orients = hn::IfThenElse(hn::And(xGty, xGtz), zeroVec, twoVec);
-	orients = hn::IfThenElse(hn::And(yGtx, yGtz), zeroVec, oneVec);
+	orients = hn::IfThenElse(hn::And(yGtx, yGtz), oneVec, orients);
 	//----------------------------------------------------------
 	auto infoOrients = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), orients);
 	auto infoIds = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), ids);
@@ -526,7 +526,7 @@ uint32_t MiniCube::getIdxAvx() const {
        	offsetIndicesArr[i] = static_cast<uint32_t>(indices[infoIdsArr[i]]);
 
 		uint64_t packed = *reinterpret_cast<uint64_t*>(indices);
-		uint64_t subtractConst = (0x0101010101010101ULL << (infoIdsArr[i]));
+		uint64_t subtractConst = (0x0101010101010101ULL << (infoIdsArr[i]*8));
 		packed -= subtractConst;
 
 		*reinterpret_cast<uint64_t*>(indices) = packed;

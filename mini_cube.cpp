@@ -481,7 +481,7 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto leftFace = hn::Set(TagTypeCI(), left);
 	auto rightFace = hn::Set(TagTypeCI(), right);
 	auto xFace = hn::IfThenElse(isRight, rightFace, leftFace);
-	auto rightOrBack = hn::Not(hn::Xor(isRight, isBack));
+	auto rightOrBack = hn::Xor(isRight, isBack);
 	xFace = hn::MaskedShiftRightOr<3>(xFace, rightOrBack, xFace);
 	auto isTop = hn::Not(isBottom);
 	xFace = hn::MaskedShiftRightOr<6>(xFace, isTop, xFace);
@@ -499,7 +499,8 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto frontFace = hn::Set(TagTypeCI(), front);
 	auto backFace = hn::Set(TagTypeCI(), back);
 	auto zFace = hn::IfThenElse(isBack, backFace, frontFace);
-	zFace = hn::MaskedShiftRightOr<3>(zFace, rightOrBack, zFace);
+	auto notRightOrBack = hn::Not(rightOrBack);
+	zFace = hn::MaskedShiftRightOr<3>(zFace, notRightOrBack, zFace);
 	zFace = hn::MaskedShiftRightOr<6>(zFace, isTop, zFace);
     zFace &= last3Bits;
 
@@ -521,6 +522,9 @@ uint32_t MiniCube::getIdxAvx() const {
 
 	alignas(16) uint16_t infoIdsArr[8];
 	hn::StoreU(ids, TagTypeCI(), infoIdsArr);
+
+	alignas(16) uint16_t infoOrientsArr[8];
+	hn::StoreU(orients, TagTypeCI(), infoOrientsArr);
 
 	for (int i = 6; i > 0; i--) {
        	offsetIndicesArr[i] = static_cast<uint32_t>(indices[infoIdsArr[i]]);

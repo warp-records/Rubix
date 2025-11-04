@@ -2,7 +2,7 @@
 #include "mini_cube.hpp"
 #include <cstdint>
 #include <cassert>
-#include <bit>
+#include <bitset>
 #include <iostream>
 
 #include "hwy/targets.h"
@@ -265,24 +265,58 @@ uint16_t MiniCube::rotFace180(uint16_t face) {
 }
 
 CubieInfo MiniCube::getCubieInfo(bool x, bool y, bool z) const {
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX getCubieInfo - Initial face values:\n";
+	std::cout << "  left:   " << std::bitset<16>(left) << "\n";
+	std::cout << "  right:  " << std::bitset<16>(right) << "\n";
+	std::cout << "  top:    " << std::bitset<16>(top) << "\n";
+	std::cout << "  bottom: " << std::bitset<16>(bottom) << "\n";
+	std::cout << "  front:  " << std::bitset<16>(front) << "\n";
+	std::cout << "  back:   " << std::bitset<16>(back) << "\n";
+	//====================DEBUG PRINT
+
     uint16_t xFace = x==0 ? left : right;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX xFace initial (x==0 ? left : right):\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(xFace) << "\n";
+	//====================DEBUG PRINT
     //checked
     xFace >>= (x^z)==0 ? 0*3 : 1*3;
     xFace >>= y==0 ?     2*3 : 0*3;
     xFace &= 0b111;
 
     uint16_t yFace = y==0 ? top : bottom;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX yFace initial (y==0 ? top : bottom):\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(yFace) << "\n";
+	//====================DEBUG PRINT
     //checked
     yFace >>= x==0 ?     1*3 : 0*3;
     yFace >>= (y^z)==0 ? 0*3 : 2*3;
     yFace &= 0b111;
 
     uint16_t zFace = z==0 ? front : back;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX zFace initial (z==0 ? front : back):\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(zFace) << "\n";
+	//====================DEBUG PRINT
     //check
     //I think we actually ignore z here since the back is inverted!
     zFace >>= (x^z)==0 ?     1*3 : 0*3;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX zFace after shift by " << ((x^z)==0 ? 1*3 : 0*3) << ":\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(zFace) << "\n";
+	//====================DEBUG PRINT
     zFace >>= y==0 ?     2*3 : 0*3;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX zFace after shift by " << (y==0 ? 2*3 : 0*3) << ":\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(zFace) << "\n";
+	//====================DEBUG PRINT
     zFace &= 0b111;
+	//====================DEBUG PRINT
+	std::cout << "\nNon-AVX zFace after mask with 0b111:\n";
+	std::cout << "  Cubie (" << x << "," << y << "," << z << "): " << std::bitset<16>(zFace) << "\n";
+	//====================DEBUG PRINT
 
     //implement ordering here
 
@@ -291,6 +325,15 @@ CubieInfo MiniCube::getCubieInfo(bool x, bool y, bool z) const {
     //I think this'll work
     uint8_t orientation = xFace > yFace && xFace > zFace ? 0 : 2;
     orientation = yFace > xFace && yFace > zFace ? 1 : orientation;
+
+	//====================DEBUG PRINT
+	std::cout << "getCubieInfo(" << x << "," << y << "," << z << "):\n";
+	std::cout << "  xFace: " << std::bitset<16>(xFace) << "\n";
+	std::cout << "  yFace: " << std::bitset<16>(yFace) << "\n";
+	std::cout << "  zFace: " << std::bitset<16>(zFace) << "\n";
+	std::cout << "  id: " << std::bitset<8>(id) << "\n";
+	std::cout << "  orientation: " << std::bitset<8>(orientation) << "\n";
+	//====================DEBUG PRINT
 
 	return CubieInfo{id, orientation};
 }
@@ -478,10 +521,28 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto isBack = hn::TestBit(loopCounter, bitMask);
 	auto last3Bits = hn::Set(TagTypeCI(), 0b111);
 
+	//====================DEBUG PRINT
+	std::cout << "\nAVX getCubieInfo (inlined) - Initial face values:\n";
+	std::cout << "  left:   " << std::bitset<16>(left) << "\n";
+	std::cout << "  right:  " << std::bitset<16>(right) << "\n";
+	std::cout << "  top:    " << std::bitset<16>(top) << "\n";
+	std::cout << "  bottom: " << std::bitset<16>(bottom) << "\n";
+	std::cout << "  front:  " << std::bitset<16>(front) << "\n";
+	std::cout << "  back:   " << std::bitset<16>(back) << "\n";
+	//====================DEBUG PRINT
+
 	auto leftFace = hn::Set(TagTypeCI(), left);
 	auto rightFace = hn::Set(TagTypeCI(), right);
 	auto xFace = hn::IfThenElse(isRight, rightFace, leftFace);
-	auto rightOrBack = hn::Not(hn::Xor(isRight, isBack));
+	//====================DEBUG PRINT
+	alignas(16) uint16_t xFaceInitial[8];
+	hn::StoreU(xFace, TagTypeCI(), xFaceInitial);
+	std::cout << "\nAVX xFace initial (isRight ? rightFace : leftFace):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(xFaceInitial[i]) << "\n";
+	}
+	//====================DEBUG PRINT
+	auto rightOrBack = hn::Xor(isRight, isBack);
 	xFace = hn::MaskedShiftRightOr<3>(xFace, rightOrBack, xFace);
 	auto isTop = hn::Not(isBottom);
 	xFace = hn::MaskedShiftRightOr<6>(xFace, isTop, xFace);
@@ -490,18 +551,59 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto topFace = hn::Set(TagTypeCI(), top);
 	auto bottomFace = hn::Set(TagTypeCI(), bottom);
 	auto yFace = hn::IfThenElse(isBottom, bottomFace, topFace);
+	//====================DEBUG PRINT
+	alignas(16) uint16_t yFaceInitial[8];
+	hn::StoreU(yFace, TagTypeCI(), yFaceInitial);
+	std::cout << "\nAVX yFace initial (isBottom ? bottomFace : topFace):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(yFaceInitial[i]) << "\n";
+	}
+	//====================DEBUG PRINT
 	auto isLeft = hn::Not(isRight);
 	yFace = hn::MaskedShiftRightOr<3>(yFace, isLeft, yFace);
-	auto bottomOrBack = hn::Not(hn::Xor(isBottom, isBack));
+	auto bottomOrBack = hn::Xor(isBottom, isBack);
 	yFace = hn::MaskedShiftRightOr<6>(yFace, bottomOrBack, yFace);
     yFace &= last3Bits;
 
 	auto frontFace = hn::Set(TagTypeCI(), front);
 	auto backFace = hn::Set(TagTypeCI(), back);
 	auto zFace = hn::IfThenElse(isBack, backFace, frontFace);
-	zFace = hn::MaskedShiftRightOr<3>(zFace, rightOrBack, zFace);
+	//====================DEBUG PRINT
+	alignas(16) uint16_t zFaceInitial[8];
+	hn::StoreU(zFace, TagTypeCI(), zFaceInitial);
+	std::cout << "\nAVX zFace initial (isBack ? backFace : frontFace):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(zFaceInitial[i]) << "\n";
+	}
+	//====================DEBUG PRINT
+	auto notRightOrBack = hn::Not(rightOrBack);
+	zFace = hn::MaskedShiftRightOr<3>(zFace, notRightOrBack, zFace);
+	//====================DEBUG PRINT
+	alignas(16) uint16_t zFaceAfterShift1[8];
+	hn::StoreU(zFace, TagTypeCI(), zFaceAfterShift1);
+	std::cout << "\nAVX zFace after MaskedShiftRightOr<3> (rightOrBack mask):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(zFaceAfterShift1[i]) << "\n";
+	}
+	//====================DEBUG PRINT
 	zFace = hn::MaskedShiftRightOr<6>(zFace, isTop, zFace);
+	//====================DEBUG PRINT
+	alignas(16) uint16_t zFaceAfterShift2[8];
+	hn::StoreU(zFace, TagTypeCI(), zFaceAfterShift2);
+	std::cout << "\nAVX zFace after MaskedShiftRightOr<6> (isTop mask):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(zFaceAfterShift2[i]) << "\n";
+	}
+	//====================DEBUG PRINT
     zFace &= last3Bits;
+	//====================DEBUG PRINT
+	alignas(16) uint16_t zFaceAfterMask[8];
+	hn::StoreU(zFace, TagTypeCI(), zFaceAfterMask);
+	std::cout << "\nAVX zFace after mask with last3Bits (0b111):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << ": " << std::bitset<16>(zFaceAfterMask[i]) << "\n";
+	}
+	//====================DEBUG PRINT
 
 	auto ids = xFace^yFace^zFace;
 
@@ -514,13 +616,35 @@ uint32_t MiniCube::getIdxAvx() const {
 	auto oneVec = hn::Set(TagTypeCI(), 1);
 	auto twoVec = hn::Set(TagTypeCI(), 2);
 	auto orients = hn::IfThenElse(hn::And(xGty, xGtz), zeroVec, twoVec);
-	orients = hn::IfThenElse(hn::And(yGtx, yGtz), zeroVec, oneVec);
+	orients = hn::IfThenElse(hn::And(yGtx, yGtz), oneVec, orients);
 	//----------------------------------------------------------
 	auto infoOrients = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), orients);
 	auto infoIds = hn::PromoteTo(hn::Rebind<uint32_t, TagTypeCI>(), ids);
 
 	alignas(16) uint16_t infoIdsArr[8];
 	hn::StoreU(ids, TagTypeCI(), infoIdsArr);
+
+	alignas(16) uint16_t infoOrientsArr[8];
+	hn::StoreU(orients, TagTypeCI(), infoOrientsArr);
+
+	//====================DEBUG PRINT
+	alignas(16) uint16_t xFaceArr[8];
+	hn::StoreU(xFace, TagTypeCI(), xFaceArr);
+	alignas(16) uint16_t yFaceArr[8];
+	hn::StoreU(yFace, TagTypeCI(), yFaceArr);
+	alignas(16) uint16_t zFaceArr[8];
+	hn::StoreU(zFace, TagTypeCI(), zFaceArr);
+
+	std::cout << "\nAVX getCubieInfo (inlined):\n";
+	for (int i = 0; i < 8; i++) {
+		std::cout << "  Cubie " << i << " (" << (i&0b001) << "," << ((i&0b010)>>1) << "," << ((i&0b100)>>2) << "):\n";
+		std::cout << "    xFace: " << std::bitset<16>(xFaceArr[i]) << "\n";
+		std::cout << "    yFace: " << std::bitset<16>(yFaceArr[i]) << "\n";
+		std::cout << "    zFace: " << std::bitset<16>(zFaceArr[i]) << "\n";
+		std::cout << "    id: " << std::bitset<8>(infoIdsArr[i]) << "\n";
+		std::cout << "    orientation: " << std::bitset<8>(infoOrientsArr[i]) << "\n";
+	}
+	//====================DEBUG PRINT
 
 	for (int i = 6; i > 0; i--) {
        	offsetIndicesArr[i] = static_cast<uint32_t>(indices[infoIdsArr[i]]);
@@ -533,7 +657,6 @@ uint32_t MiniCube::getIdxAvx() const {
 	}
 
     using TagType = hn::FixedTag<uint32_t, 8>;
-
 
 	// apparently you have
 	// auto infoIdsAsIndices = hn::IndicesFromVec(TagType(), infoIds);
@@ -562,6 +685,42 @@ uint32_t MiniCube::getIdxAvx() const {
 
 	totalOffset  = hn::IfThenElseZero(mask, totalOffset);
 	idx = hn::ReduceSum(TagType(), totalOffset);
+
+	//====================DEBUG PRINT
+	std::cout << "\nCalling getCubieInfo for all cubies:\n";
+	for (int i = 0; i < 8; i++) {
+		getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
+	}
+
+	std::cout << "\n=== VERIFICATION: Comparing AVX vs Non-AVX ===\n";
+	bool allMatch = true;
+	for (int i = 0; i < 8; i++) {
+		auto info = getCubieInfo(i&0b001, (i&0b010)>>1, (i&0b100)>>2);
+
+		if (info.id != infoIdsArr[i] || info.orientation != infoOrientsArr[i]) {
+			allMatch = false;
+			std::cout << "MISMATCH at cubie " << i << " (" << (i&0b001) << "," << ((i&0b010)>>1) << "," << ((i&0b100)>>2) << "):\n";
+			std::cout << "  Non-AVX ID: " << std::bitset<8>(info.id) << " (" << (int)info.id << ")\n";
+			std::cout << "  AVX ID:     " << std::bitset<8>(infoIdsArr[i]) << " (" << infoIdsArr[i] << ")\n";
+			std::cout << "  Non-AVX Orient: " << std::bitset<8>(info.orientation) << " (" << (int)info.orientation << ")\n";
+			std::cout << "  AVX Orient:     " << std::bitset<8>(infoOrientsArr[i]) << " (" << infoOrientsArr[i] << ")\n";
+		} else {
+			std::cout << "Cubie " << i << " MATCH: id=" << (int)info.id << " orient=" << (int)info.orientation << "\n";
+		}
+	}
+
+	if (allMatch) {
+		std::cout << "\n✓ All cubies match between AVX and Non-AVX implementations!" << std::endl;
+	} else {
+		std::cout << "\n✗ Mismatches found between AVX and Non-AVX implementations!" << std::endl;
+		throw std::runtime_error("AVX implementation differs from non-AVX implementation");
+	}
+
+	std::cout << "AVX idx calculation: " << idx << std::endl;
+	std::cout << "non AVX idx calculation: " << getIdxNorm() << std::endl;
+
+	throw std::runtime_error("Debug complete - stopping execution");
+	//====================DEBUG PRINT
 
 	return idx;
 }

@@ -101,7 +101,7 @@ int main() {
     qb = qb.rotXaxis(CrossSection::Middle, Direction::Right);
     qb = qb.rotVert(Column::Right, Direction::_180);
     qb = qb.rotHoriz(Row::Bottom, Direction::Left);
-    qb = qb.rotXaxis(CrossSection::Front, Direction::_180);
+    // qb = qb.rotXaxis(CrossSection::Front, Direction::_180);
     // qb = qb.rotVert(Column::Left, Direction::_180);
     // qb = qb.rotXaxis(CrossSection::Front, Direction::Right);
     // qb = qb.rotHoriz(Row::Top, Direction::Left);
